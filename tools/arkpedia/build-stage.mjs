@@ -28,9 +28,15 @@ for (const key of ['stage', 'geometry', 'out']) if (!args[key]) throw Error(`Mis
 const read = async file => JSON.parse(await readFile(file, 'utf8'));
 const [source, geometry, playbackFile, mvp, records, support, tokenData] = await Promise.all([
   read(args.stage), read(args.geometry), args.playback ? read(args.playback) : { playbackPaths: {} }, read(new URL('../../data/arkpedia-mvp.json', import.meta.url)),
-  read(new URL('../../data/arkpedia-enemy-records.json', import.meta.url)),
-  read(new URL('../../data/arkpedia-enemy-support.json', import.meta.url)), read(new URL('../../data/arkpedia-deployable-tokens.json', import.meta.url)),
+  read(new URL(args.candidate === 'ch16' ? '../../data/candidates/arkpedia-enemy-records.canonical.json' : '../../data/arkpedia-enemy-records.json', import.meta.url)),
+  read(new URL(args.candidate === 'ch16' ? '../../data/candidates/arkpedia-ch16-enemy-support.json' : '../../data/arkpedia-enemy-support.json', import.meta.url)), read(new URL('../../data/arkpedia-deployable-tokens.json', import.meta.url)),
 ]);
+if (args.candidate === 'ch16') {
+  if (source.code !== '16-2') throw Error('Chapter 16 candidate admission is currently reviewed only for test-only 16-2');
+  const raw = await readFile(new URL('../../data/candidates/arkpedia-enemy-records.canonical.json', import.meta.url));
+  if (createHash('sha256').update(raw).digest('hex') !== support.source.records.sha256)
+    throw Error('Candidate support was generated from another canonical snapshot');
+}
 const supportOperators = await read(new URL('../../data/arkpedia-support-operators.json', import.meta.url));
 const conditionalPath = args.conditional ?? join(dirname(args.geometry), '..', 'stage-conditional', basename(args.geometry));
 if (geometry.hasConditionalSpawns && existsSync(conditionalPath)) {
@@ -64,6 +70,7 @@ const supportForStage = Object.fromEntries(fixedCards
   .filter(card => !mvp.operators[card.unit_id] && supportOperators.operators[card.unit_id])
   .map(card => [card.unit_id, supportOperators.operators[card.unit_id]]));
 const stage = {
+  ...(args.candidate === 'ch16' ? { testOnly: true, enemyCatalogue: 'canonical-ch16-candidate-v1', canonicalData: records.canonicalData, upstream: records.upstream } : {}),
   code: source.code,
   name: source.name,
   description: source.description,
@@ -119,6 +126,7 @@ const addEnemy = id => {
   enemyIds.add(id);
   for (const child of support.enemies[id].spawns ?? []) addEnemy(child);
 };
+for (const device of devices) if (device.key === 'trap_329_rift') addEnemy('enemy_10211_murad');
 for (const spawn of adapter.spawns) addEnemy(spawn.enemyKey);
 stage.enemies = Object.fromEntries([...enemyIds].map(id => [id, configured(id)]));
 assertRegularEnemies({ ...mvp, enemies: stage.enemies, stage });

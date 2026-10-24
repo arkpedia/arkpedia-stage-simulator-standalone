@@ -7,7 +7,7 @@ import { verifiedNative } from '../tools/arkpedia/enemy-support.mjs';
 import { deriveEnemySupport, prefabPath } from '../shared/arkpedia/enemy-support.js';
 
 const read = name => JSON.parse(readFileSync(new URL(`../data/${name}`, import.meta.url)));
-const candidate = read('candidates/arkpedia-ch16-native-abilities.json');
+const candidate = { ...read('candidates/arkpedia-ch16-native-abilities.json'), actions: read('candidates/arkpedia-ch16-action-source.json') };
 const indexBytes = readFileSync(new URL('../data/arkpedia-enemy-clock-source.json', import.meta.url));
 const index = JSON.parse(indexBytes);
 const indexSha = createHash('sha256').update(indexBytes).digest('hex');
@@ -32,13 +32,36 @@ test('candidate original component corruption fails the existing evidence verifi
   assert.throws(() => verifiedNative(changed, index.prefabs, indexSha, templates), /does not match the timing index/);
 });
 
-test('native availability does not admit unimplemented chapter 16 enemy behavior', () => {
+test('all six base prefabs require complete records and reviewed native contracts', () => {
   const records = read('candidates/arkpedia-enemy-records.canonical.json');
   const support = deriveEnemySupport(Object.fromEntries(keys.map(key => [key, records.enemies[key]])),
     index.prefabs, candidate);
   for (const key of keys) {
-    assert.equal(support[key].policy, null, key);
-    assert.ok(support[key].reasons.length, key);
-    assert.ok(support[key].reasons.every(reason => !reason.startsWith('prefab-missing:')), key);
+    assert.equal(support[key].policy, 'stats-attacks-and-features', key);
+    assert.deepEqual(support[key].reasons, [], key);
   }
+});
+
+test('miner support requires its retained native healing clock and passive reference', () => {
+  const records = read('candidates/arkpedia-enemy-records.canonical.json');
+  for (const change of [
+    c => { c._buffs[0].triggerInterval = 0.5; },
+    c => { c._buffs[0].templateKey = 'unreviewed_heal'; },
+  ]) {
+    const changed = structuredClone(candidate), row = changed.prefabs[prefabPath(keys[0])].find(c => c.objectName === 'GetHeal' && !c.referenced);
+    const component = JSON.parse(row.originalJson); change(component); row.originalJson = JSON.stringify(component);
+    const support = deriveEnemySupport({ [keys[0]]: records.enemies[keys[0]] }, index.prefabs, changed);
+    assert.equal(support[keys[0]].policy, null);
+  }
+});
+
+
+test('miner support refuses a changed native profession validator', () => {
+  const records = read('candidates/arkpedia-enemy-records.canonical.json'), changed = structuredClone(candidate);
+  const rows = changed.prefabs[prefabPath(keys[0])];
+  const heal = JSON.parse(rows.find(c => c.objectName === 'GetHeal' && !c.referenced).originalJson);
+  const validator = rows.find(c => c.pathId === heal._targetValidator.m_PathID);
+  const value = JSON.parse(validator.originalJson); value._targetOptions.professionMask = 16;
+  validator.originalJson = JSON.stringify(value);
+  assert.equal(deriveEnemySupport({ [keys[0]]: records.enemies[keys[0]] }, index.prefabs, changed)[keys[0]].policy, null);
 });

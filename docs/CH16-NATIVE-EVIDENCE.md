@@ -40,11 +40,12 @@ Add `--check` to verify the candidate without writing it. The original default
 extraction and `--check` still target the original evidence file. Targeted
 extraction requires a separate output and refuses to overwrite that default.
 
-Remaining work is implementation: the civilian's GetHeal, FearLoseBlood and
+The original implementation handoff covered the civilian's GetHeal, FearLoseBlood and
 TileEscapeShadowManager behaviors; ChargeRift; ReverseDamage/MuradPollut;
 DeadSummon; shield/StealAtk/LockDamage; and Murad's visibility/beam lifecycle.
-The existing support verifier still rejects these enemies for their unhandled
-features. Compile candidate support against the complete canonical enemy
+The current behavior/admission status is in `CH16-BEHAVIORS.md`. All six base controllers
+now clear candidate support under exact native contracts; stage admission remains
+restricted to test-only 16-2. Compile candidate support against the complete canonical enemy
 candidate and verified merged evidence; do not overlay one enemy into the old
 public catalogue. Implement and review behaviors before building/admitting
 stages. No production pointer or public registry changes are part of this work.
